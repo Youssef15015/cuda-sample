@@ -18,19 +18,12 @@
 
 #include <stdio.h>
 #include <math.h>
+#include <cooperative_groups.h>
+
+namespace cg = cooperative_groups;
 #include "helper_math.h"
 #include "math_constants.h"
 #include "particles_kernel.cuh"
-
-#if USE_TEX
-// textures for particle position and velocity
-texture<float4, 1, cudaReadModeElementType> oldPosTex;
-texture<float4, 1, cudaReadModeElementType> oldVelTex;
-
-texture<uint, 1, cudaReadModeElementType> gridParticleHashTex;
-texture<uint, 1, cudaReadModeElementType> cellStartTex;
-texture<uint, 1, cudaReadModeElementType> cellEndTex;
-#endif
 
 // simulation parameters in constant memory
 __constant__ SimParams params;
@@ -51,12 +44,15 @@ struct integrate_functor
         volatile float4 velData = thrust::get<1>(t);
         float3 pos = make_float3(posData.x, posData.y, posData.z);
         float3 vel = make_float3(velData.x, velData.y, velData.z);
+     //   float3 Y = make_float3(velData.x*velData.x+velData.y*velData.y+velData.z*velData.z)
 
-        vel += params.gravity * deltaTime;
+        // params.gamma = 1/(pow(1-pow((vel),2),0.5));
+
+        vel += ( params.electric + cross(vel, params.magnetic)*sqrt(1-(velData.x*velData.x+velData.y*velData.y+velData.z*velData.z))  ) * deltaTime;
         vel *= params.globalDamping;
 
         // new position = old position + velocity * deltaTime
-        pos += vel * deltaTime;
+        pos += (vel * deltaTime) *sqrt(1-(velData.x*velData.x+velData.y*velData.y+velData.z*velData.z));
 
         // set this to zero to disable collisions with cube sides
 #if 1
@@ -159,6 +155,8 @@ void reorderDataAndFindCellStartD(uint   *cellStart,        // output: cell star
                                   float4 *oldVel,           // input: sorted velocity array
                                   uint    numParticles)
 {
+    // Handle to thread block group
+    cg::thread_block cta = cg::this_thread_block();
     extern __shared__ uint sharedHash[];    // blockSize + 1 elements
     uint index = __umul24(blockIdx.x,blockDim.x) + threadIdx.x;
 
@@ -181,7 +179,7 @@ void reorderDataAndFindCellStartD(uint   *cellStart,        // output: cell star
         }
     }
 
-    __syncthreads();
+    cg::sync(cta);
 
     if (index < numParticles)
     {
@@ -206,8 +204,8 @@ void reorderDataAndFindCellStartD(uint   *cellStart,        // output: cell star
 
         // Now use the sorted index to reorder the pos and vel data
         uint sortedIndex = gridParticleIndex[index];
-        float4 pos = FETCH(oldPos, sortedIndex);       // macro does either global read or texture fetch
-        float4 vel = FETCH(oldVel, sortedIndex);       // see particles_kernel.cuh
+        float4 pos = oldPos[sortedIndex];
+        float4 vel = oldVel[sortedIndex];
 
         sortedPos[index] = pos;
         sortedVel[index] = vel;
@@ -270,21 +268,21 @@ float3 collideCell(int3    gridPos,
     uint gridHash = calcGridHash(gridPos);
 
     // get start of bucket for this cell
-    uint startIndex = FETCH(cellStart, gridHash);
+    uint startIndex = cellStart[gridHash];
 
     float3 force = make_float3(0.0f);
 
     if (startIndex != 0xffffffff)          // cell is not empty
     {
         // iterate over particles in this cell
-        uint endIndex = FETCH(cellEnd, gridHash);
+        uint endIndex = cellEnd[gridHash];
 
         for (uint j=startIndex; j<endIndex; j++)
         {
             if (j != index)                // check not colliding with self
             {
-                float3 pos2 = make_float3(FETCH(oldPos, j));
-                float3 vel2 = make_float3(FETCH(oldVel, j));
+                float3 pos2 = make_float3(oldPos[j]);
+                float3 vel2 = make_float3(oldVel[j]);
 
                 // collide two spheres
                 force += collideSpheres(pos, pos2, vel, vel2, params.particleRadius, params.particleRadius, params.attraction);
@@ -310,8 +308,8 @@ void collideD(float4 *newVel,               // output: new velocity
     if (index >= numParticles) return;
 
     // read particle data from sorted arrays
-    float3 pos = make_float3(FETCH(oldPos, index));
-    float3 vel = make_float3(FETCH(oldVel, index));
+    float3 pos = make_float3(oldPos[index]);
+    float3 vel = make_float3(oldVel[index]);
 
     // get address in grid
     int3 gridPos = calcGridPos(pos);

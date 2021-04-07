@@ -80,10 +80,21 @@ class ParticleSystem
         {
             m_params.globalDamping = x;
         }
-        void setGravity(float x)
+//        void setGravity(float x)
+//        {
+//            m_params.gravity = make_float3(0.0f, x, 0.0f);
+//        }
+
+        void setElectric(float x)
         {
-            m_params.gravity = make_float3(0.0f, x, 0.0f);
-        }
+            m_params.electric = make_float3(0.0f, x, 0.0f);
+        }        
+
+
+        void setMagnetic(float x)
+        {
+            m_params.magnetic = make_float3(0.0f, 0.0f,x);
+        }        
 
         void setCollideSpring(float x)
         {

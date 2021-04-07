@@ -12,14 +12,6 @@
 #ifndef PARTICLES_KERNEL_H
 #define PARTICLES_KERNEL_H
 
-#define USE_TEX 0
-
-#if USE_TEX
-#define FETCH(t, i) tex1Dfetch(t##Tex, i)
-#else
-#define FETCH(t, i) t[i]
-#endif
-
 #include "vector_types.h"
 typedef unsigned int uint;
 
@@ -29,7 +21,11 @@ struct SimParams
     float3 colliderPos;
     float  colliderRadius;
 
-    float3 gravity;
+//    float3 gravity;
+    float3 electric;
+    float3 gamma;
+    float3 magnetic;
+    float3 lorentz;
     float globalDamping;
     float particleRadius;
 

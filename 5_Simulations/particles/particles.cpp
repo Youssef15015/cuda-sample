@@ -21,7 +21,7 @@
 */
 
 // OpenGL Graphics includes
-#include <GL/glew.h>
+#include <helper_gl.h>
 #if defined (WIN32)
 #include <GL/wglew.h>
 #endif
@@ -41,7 +41,6 @@
 // CUDA utilities and system includes
 #include <helper_functions.h>
 #include <helper_cuda.h>    // includes cuda.h and cuda_runtime_api.h
-#include <helper_cuda_gl.h> // includes cuda_gl_interop.h// includes cuda_gl_interop.h
 
 // Includes
 #include <stdlib.h>
@@ -57,7 +56,7 @@
 #define THRESHOLD         0.30f
 
 #define GRID_SIZE       64
-#define NUM_PARTICLES   16384
+#define NUM_PARTICLES   500000
 
 const uint width = 640, height = 480;
 
@@ -90,7 +89,9 @@ int numIterations = 0; // run until exit
 // simulation parameters
 float timestep = 0.5f;
 float damping = 1.0f;
-float gravity = 0.0003f;
+//float gravity = 0.0003f;
+float electric = 0.0003f;
+float magnetic = 0.0003f;
 int iterations = 1;
 int ballr = 10;
 
@@ -148,12 +149,6 @@ void cleanup()
     {
         delete psystem;
     }
-    // cudaDeviceReset causes the driver to clean up all state. While
-    // not mandatory in normal operation, it is good practice.  It is also
-    // needed to ensure correct operation when the application is being
-    // profiled. Calling cudaDeviceReset causes all profile data to be
-    // flushed before the application exits
-    cudaDeviceReset();
     return;
 }
 
@@ -163,11 +158,10 @@ void initGL(int *argc, char **argv)
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGB | GLUT_DEPTH | GLUT_DOUBLE);
     glutInitWindowSize(width, height);
-    glutCreateWindow("CUDA Particles");
+    glutCreateWindow("CUDA Particles Simulation");
 
-    glewInit();
-
-    if (!glewIsSupported("GL_VERSION_2_0 GL_VERSION_1_5 GL_ARB_multitexture GL_ARB_vertex_buffer_object"))
+    if (!isGLVersionSupported(2,0) ||
+        !areGLExtensionsSupported("GL_ARB_multitexture GL_ARB_vertex_buffer_object"))
     {
         fprintf(stderr, "Required OpenGL extensions missing.");
         exit(EXIT_FAILURE);
@@ -216,13 +210,43 @@ void runBenchmark(int iterations, char *exec_path)
 
         sdkDumpBin((void *)hPos, sizeof(float)*4*psystem->getNumParticles(), "particles.bin");
 
-        if (!sdkCompareBin2BinFloat("particles.bin", g_refFile, sizeof(float)*4*psystem->getNumParticles(),
+        if (!sdkCompareBin2BinFloat("particles.bin", g_refFile, 4*psystem->getNumParticles(),
                                     MAX_EPSILON_ERROR, THRESHOLD, exec_path))
         {
             g_TotalErrors++;
         }
     }
 }
+
+
+
+//void save_velocities( char *exec_path)
+//{
+//    printf("Run %u particles simulation for %d iterations...\n\n", numParticles, iterations);
+//   cudaDeviceSynchronize();
+
+//    cudaDeviceSynchronize();
+
+
+//     if (g_refFile)
+//     {
+//         printf("\nChecking result...\n\n");
+//         float *hPos = (float *)malloc(sizeof(float)*4*psystem->getNumParticles());
+//         copyArrayFromDevice(hPos, psystem->getCudaPosVBO(),
+//                             0, sizeof(float)*4*psystem->getNumParticles());
+// 
+//         sdkDumpBin((void *)hPos, sizeof(float)*4*psystem->getNumParticles(), "particles.bin");
+// 
+//         if (!sdkCompareBin2BinFloat("particles.bin", g_refFile, 4*psystem->getNumParticles(),
+//                                     MAX_EPSILON_ERROR, THRESHOLD, exec_path))
+//         {
+//             g_TotalErrors++;
+//         }
+//     }
+// }
+//
+//
+//
 
 void computeFPS()
 {
@@ -252,11 +276,13 @@ void display()
     {
         psystem->setIterations(iterations);
         psystem->setDamping(damping);
-        psystem->setGravity(-gravity);
-        psystem->setCollideSpring(collideSpring);
-        psystem->setCollideDamping(collideDamping);
+//        psystem->setGravity(-gravity);
+        psystem->setElectric(-electric);
+        psystem->setMagnetic(-magnetic);
+//        psystem->setCollideSpring(collideSpring);
+//        psystem->setCollideDamping(collideDamping);
         psystem->setCollideShear(collideShear);
-        psystem->setCollideAttraction(collideAttraction);
+//        psystem->setCollideAttraction(collideAttraction);
 
         psystem->update(timestep);
 
@@ -645,28 +671,30 @@ void initParams()
     {
         timestep = 0.0f;
         damping = 0.0f;
-        gravity = 0.0f;
+//        gravity = 0.0f;
+        electric = 0.0f;
+        magnetic = 0.0f;
         ballr = 1;
         collideSpring = 0.0f;
         collideDamping = 0.0f;
         collideShear = 0.0f;
         collideAttraction = 0.0f;
-
     }
     else
     {
-
         // create a new parameter list
         params = new ParamListGL("misc");
         params->AddParam(new Param<float>("time step", timestep, 0.0f, 1.0f, 0.01f, &timestep));
         params->AddParam(new Param<float>("damping"  , damping , 0.0f, 1.0f, 0.001f, &damping));
-        params->AddParam(new Param<float>("gravity"  , gravity , 0.0f, 0.001f, 0.0001f, &gravity));
+ //       params->AddParam(new Param<float>("gravity"  , gravity , 0.0f, 0.001f, 0.0001f, &gravity));
+        params->AddParam(new Param<float>("electric"  , electric , 0.0f, 0.01f, 0.001f, &electric));
+        params->AddParam(new Param<float>("magnetic"  , magnetic , 0.0f, 0.01f, 0.001f, &magnetic));
         params->AddParam(new Param<int> ("ball radius", ballr , 1, 20, 1, &ballr));
 
-        params->AddParam(new Param<float>("collide spring" , collideSpring , 0.0f, 1.0f, 0.001f, &collideSpring));
-        params->AddParam(new Param<float>("collide damping", collideDamping, 0.0f, 0.1f, 0.001f, &collideDamping));
+        // params->AddParam(new Param<float>("collide spring" , collideSpring , 0.0f, 1.0f, 0.001f, &collideSpring));
+        // params->AddParam(new Param<float>("collide damping", collideDamping, 0.0f, 0.1f, 0.001f, &collideDamping));
         params->AddParam(new Param<float>("collide shear"  , collideShear  , 0.0f, 0.1f, 0.001f, &collideShear));
-        params->AddParam(new Param<float>("collide attract", collideAttraction, 0.0f, 0.1f, 0.001f, &collideAttraction));
+        // params->AddParam(new Param<float>("collide attract", collideAttraction, 0.0f, 0.1f, 0.001f, &collideAttraction));
     }
 }
 
@@ -740,7 +768,7 @@ main(int argc, char **argv)
         numIterations = getCmdLineArgumentInt(argc, (const char **) argv, "i");
     }
 
-    if (g_refFile)
+    if (benchmark || g_refFile)
     {
         cudaInit(argc, argv);
     }
@@ -757,16 +785,11 @@ main(int argc, char **argv)
         }
 
         initGL(&argc, argv);
-        cudaGLInit(argc, argv);
+        cudaInit(argc, argv);
     }
 
-    initParticleSystem(numParticles, gridSize, g_refFile==NULL);
+    initParticleSystem(numParticles, gridSize, !benchmark && g_refFile==NULL);
     initParams();
-
-    if (!g_refFile)
-    {
-        initMenus();
-    }
 
     if (benchmark || g_refFile)
     {
@@ -779,6 +802,11 @@ main(int argc, char **argv)
     }
     else
     {
+        if (!g_refFile)
+        {
+            initMenus();
+        }
+
         glutDisplayFunc(display);
         glutReshapeFunc(reshape);
         glutMouseFunc(mouse);
@@ -790,19 +818,13 @@ main(int argc, char **argv)
         glutCloseFunc(cleanup);
 
         glutMainLoop();
-    }
+    }     
 
     if (psystem)
     {
         delete psystem;
     }
 
-    // cudaDeviceReset causes the driver to clean up all state. While
-    // not mandatory in normal operation, it is good practice.  It is also
-    // needed to ensure correct operation when the application is being
-    // profiled. Calling cudaDeviceReset causes all profile data to be
-    // flushed before the application exits
-    cudaDeviceReset();
     exit(g_TotalErrors > 0 ? EXIT_FAILURE : EXIT_SUCCESS);
 }
 

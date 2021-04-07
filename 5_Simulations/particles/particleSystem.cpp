@@ -9,6 +9,10 @@
  *
  */
 
+// OpenGL Graphics includes
+#define HELPERGL_EXTERN_GL_FUNC_IMPLEMENTATION
+#include <helper_gl.h>
+
 #include "particleSystem.h"
 #include "particleSystem.cuh"
 #include "particles_kernel.cuh"
@@ -24,7 +28,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <algorithm>
-#include <GL/glew.h>
 
 #ifndef CUDART_PI_F
 #define CUDART_PI_F         3.141592654f
@@ -52,7 +55,7 @@ ParticleSystem::ParticleSystem(uint numParticles, uint3 gridSize, bool bUseOpenG
     m_params.numCells = m_numGridCells;
     m_params.numBodies = m_numParticles;
 
-    m_params.particleRadius = 1.0f / 64.0f;
+    m_params.particleRadius = 1.0f / 128.0f;
     m_params.colliderPos = make_float3(-1.2f, -0.8f, 0.8f);
     m_params.colliderRadius = 0.2f;
 
@@ -65,9 +68,11 @@ ParticleSystem::ParticleSystem(uint numParticles, uint3 gridSize, bool bUseOpenG
     m_params.damping = 0.02f;
     m_params.shear = 0.1f;
     m_params.attraction = 0.0f;
-    m_params.boundaryDamping = -0.5f;
+    m_params.boundaryDamping = -1.0f;
 
-    m_params.gravity = make_float3(0.0f, -0.0003f, 0.0f);
+//    m_params.gravity = make_float3(0.0f, -0.0003f, 0.0f);
+    m_params.electric = make_float3(0.0f, -0.0003f, 0.0f);
+    m_params.magnetic = make_float3(0.0f, 0.0f, -0.0003f);
     m_params.globalDamping = 1.0f;
 
     _initialize(numParticles);
@@ -166,8 +171,8 @@ ParticleSystem::_initialize(int numParticles)
         registerGLBufferObject(m_colorVBO, &m_cuda_colorvbo_resource);
 
         // fill color buffer
-        glBindBufferARB(GL_ARRAY_BUFFER, m_colorVBO);
-        float *data = (float *) glMapBufferARB(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
+        glBindBuffer(GL_ARRAY_BUFFER, m_colorVBO);
+        float *data = (float *) glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
         float *ptr = data;
 
         for (uint i=0; i<m_numParticles; i++)
@@ -184,7 +189,7 @@ ParticleSystem::_initialize(int numParticles)
             *ptr++ = 1.0f;
         }
 
-        glUnmapBufferARB(GL_ARRAY_BUFFER);
+        glUnmapBuffer(GL_ARRAY_BUFFER);
     }
     else
     {
@@ -386,6 +391,10 @@ ParticleSystem::setArray(ParticleArray array, const float *data, int start, int 
                     glBindBuffer(GL_ARRAY_BUFFER, 0);
                     registerGLBufferObject(m_posVbo, &m_cuda_posvbo_resource);
                 }
+                else
+                {
+                    copyArrayToDevice(m_cudaPosVBO, data, start*4*sizeof(float), count*4*sizeof(float));
+                }
             }
             break;
 
@@ -450,10 +459,10 @@ ParticleSystem::reset(ParticleConfig config)
                     m_hPos[p++] = 2 * (point[1] - 0.5f);
                     m_hPos[p++] = 2 * (point[2] - 0.5f);
                     m_hPos[p++] = 1.0f; // radius
-                    m_hVel[v++] = 0.0f;
-                    m_hVel[v++] = 0.0f;
-                    m_hVel[v++] = 0.0f;
-                    m_hVel[v++] = 0.0f;
+                    m_hVel[v++] = 0.1f;
+                    m_hVel[v++] = 0.1f;
+                    m_hVel[v++] = 0.1f;
+                    m_hVel[v++] = 0.1f;
                 }
             }
             break;

@@ -55,7 +55,7 @@
 #define MAX_EPSILON_ERROR 5.00f
 #define THRESHOLD         0.30f
 
-#define GRID_SIZE       64
+#define GRID_SIZE       200
 #define NUM_PARTICLES   500000
 
 const uint width = 640, height = 480;
@@ -87,11 +87,11 @@ uint3 gridSize;
 int numIterations = 0; // run until exit
 
 // simulation parameters
-float timestep = 0.5f;
+float timestep = 0.0000000045f;
 float damping = 1.0f;
 //float gravity = 0.0003f;
-float electric = 0.0003f;
-float magnetic = 0.0003f;
+float electric = 0.000000000001f;
+float magnetic = 0.000000000001f;
 int iterations = 1;
 int ballr = 10;
 
@@ -129,7 +129,7 @@ extern "C" void copyArrayFromDevice(void *host, const void *device, unsigned int
 void initParticleSystem(int numParticles, uint3 gridSize, bool bUseOpenGL)
 {
     psystem = new ParticleSystem(numParticles, gridSize, bUseOpenGL);
-    psystem->reset(ParticleSystem::CONFIG_GRID);
+    psystem->reset(ParticleSystem::CONFIG_RANDOM);
 
     if (bUseOpenGL)
     {
@@ -277,14 +277,16 @@ void display()
         psystem->setIterations(iterations);
         psystem->setDamping(damping);
 //        psystem->setGravity(-gravity);
-        psystem->setElectric(-electric);
-        psystem->setMagnetic(-magnetic);
+        psystem->setElectric(-electric,timestep);
+        psystem->setMagnetic(-magnetic,timestep);
 //        psystem->setCollideSpring(collideSpring);
 //        psystem->setCollideDamping(collideDamping);
         psystem->setCollideShear(collideShear);
 //        psystem->setCollideAttraction(collideAttraction);
 
         psystem->update(timestep);
+        psystem->dumpParticles(0, 10000);
+        
 
         if (renderer)
         {
@@ -542,6 +544,7 @@ void key(unsigned char key, int /*x*/, int /*y*/)
 
         case 13:
             psystem->update(timestep);
+          
 
             if (renderer)
             {
@@ -576,7 +579,7 @@ void key(unsigned char key, int /*x*/, int /*y*/)
             break;
 
         case 'u':
-            psystem->dumpParticles(0, numParticles-1);
+            psystem->dumpParticles(0,10000);
             break;
 
         case 'r':
@@ -669,11 +672,11 @@ void initParams()
 {
     if (g_refFile)
     {
-        timestep = 0.0f;
+        timestep = 0.0000000045f;
         damping = 0.0f;
 //        gravity = 0.0f;
-        electric = 0.0f;
-        magnetic = 0.0f;
+        electric = 0.000000000001f;
+        magnetic = 0.000000000001f;
         ballr = 1;
         collideSpring = 0.0f;
         collideDamping = 0.0f;
@@ -684,12 +687,12 @@ void initParams()
     {
         // create a new parameter list
         params = new ParamListGL("misc");
-        params->AddParam(new Param<float>("time step", timestep, 0.0f, 1.0f, 0.01f, &timestep));
+        params->AddParam(new Param<float>("time step", timestep, 0.0f, 0.00000001f, 0.0000000005f, &timestep));
         params->AddParam(new Param<float>("damping"  , damping , 0.0f, 1.0f, 0.001f, &damping));
  //       params->AddParam(new Param<float>("gravity"  , gravity , 0.0f, 0.001f, 0.0001f, &gravity));
-        params->AddParam(new Param<float>("electric"  , electric , 0.0f, 0.01f, 0.001f, &electric));
-        params->AddParam(new Param<float>("magnetic"  , magnetic , 0.0f, 0.01f, 0.001f, &magnetic));
-        params->AddParam(new Param<int> ("ball radius", ballr , 1, 20, 1, &ballr));
+        params->AddParam(new Param<float>("electric"  , electric , 0.0f, 0.00000000001f, 0.000000000001f, &electric));
+        params->AddParam(new Param<float>("magnetic"  , magnetic , 0.0f, 0.00000000001f, 0.000000000001f, &magnetic));
+  //      params->AddParam(new Param<int> ("ball radius", ballr , 1, 20, 1, &ballr));
 
         // params->AddParam(new Param<float>("collide spring" , collideSpring , 0.0f, 1.0f, 0.001f, &collideSpring));
         // params->AddParam(new Param<float>("collide damping", collideDamping, 0.0f, 0.1f, 0.001f, &collideDamping));

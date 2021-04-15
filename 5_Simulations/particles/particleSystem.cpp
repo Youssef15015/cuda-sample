@@ -55,7 +55,7 @@ ParticleSystem::ParticleSystem(uint numParticles, uint3 gridSize, bool bUseOpenG
     m_params.numCells = m_numGridCells;
     m_params.numBodies = m_numParticles;
 
-    m_params.particleRadius = 1.0f / 128.0f;
+    m_params.particleRadius = 1.0f / 1596910.0f;
     m_params.colliderPos = make_float3(-1.2f, -0.8f, 0.8f);
     m_params.colliderRadius = 0.2f;
 
@@ -71,8 +71,8 @@ ParticleSystem::ParticleSystem(uint numParticles, uint3 gridSize, bool bUseOpenG
     m_params.boundaryDamping = -1.0f;
 
 //    m_params.gravity = make_float3(0.0f, -0.0003f, 0.0f);
-    m_params.electric = make_float3(0.0f, -0.0003f, 0.0f);
-    m_params.magnetic = make_float3(0.0f, 0.0f, -0.0003f);
+    m_params.electric = make_float3(0.0f, -0.3f, 0.0f);
+    m_params.magnetic = make_float3(0.0f, 0.0f, -0.3f);
     m_params.globalDamping = 1.0f;
 
     _initialize(numParticles);
@@ -253,6 +253,10 @@ ParticleSystem::update(float deltaTime)
         dPos = (float *) m_cudaPosVBO;
     }
 
+
+
+
+
     // update constants
     setParameters(&m_params);
 
@@ -262,6 +266,10 @@ ParticleSystem::update(float deltaTime)
         m_dVel,
         deltaTime,
         m_numParticles);
+
+
+
+
 
     // calculate grid hash
     calcHash(
@@ -298,11 +306,21 @@ ParticleSystem::update(float deltaTime)
         m_numParticles,
         m_numGridCells);
 
+
+
+
+
     // note: do unmap at end here to avoid unnecessary graphics/CUDA context switch
     if (m_bUseOpenGL)
     {
         unmapGLBufferObject(m_cuda_posvbo_resource);
     }
+
+
+
+        
+
+
 }
 
 void
@@ -340,6 +358,7 @@ ParticleSystem::dumpParticles(uint start, uint count)
     for (uint i=start; i<start+count; i++)
     {
         //        printf("%d: ", i);
+        // printf("particle number: %5i \n", i);
         printf("pos: (%.4f, %.4f, %.4f, %.4f)\n", m_hPos[i*4+0], m_hPos[i*4+1], m_hPos[i*4+2], m_hPos[i*4+3]);
         printf("vel: (%.4f, %.4f, %.4f, %.4f)\n", m_hVel[i*4+0], m_hVel[i*4+1], m_hVel[i*4+2], m_hVel[i*4+3]);
     }
@@ -397,7 +416,6 @@ ParticleSystem::setArray(ParticleArray array, const float *data, int start, int 
                 }
             }
             break;
-
         case VELOCITY:
             copyArrayToDevice(m_dVel, data, start*4*sizeof(float), count*4*sizeof(float));
             break;
@@ -459,10 +477,10 @@ ParticleSystem::reset(ParticleConfig config)
                     m_hPos[p++] = 2 * (point[1] - 0.5f);
                     m_hPos[p++] = 2 * (point[2] - 0.5f);
                     m_hPos[p++] = 1.0f; // radius
-                    m_hVel[v++] = 0.1f;
-                    m_hVel[v++] = 0.1f;
-                    m_hVel[v++] = 0.1f;
-                    m_hVel[v++] = 0.1f;
+                    m_hVel[v++] = frand()*1.0f-0.5f;
+                    m_hVel[v++] = frand()*1.0f-0.5f;
+                    m_hVel[v++] = frand()*1.0f-0.5f;
+                    m_hVel[v++] = 0;
                 }
             }
             break;
@@ -470,7 +488,7 @@ ParticleSystem::reset(ParticleConfig config)
         case CONFIG_GRID:
             {
                 float jitter = m_params.particleRadius*0.01f;
-                uint s = (int) ceilf(powf((float) m_numParticles, 1.0f / 3.0f));
+                uint s = (int) ceilf(powf((float) m_numParticles, 1.0f / 1.8f));
                 uint gridSize[3];
                 gridSize[0] = gridSize[1] = gridSize[2] = s;
                 initGrid(gridSize, m_params.particleRadius*2.0f, jitter, m_numParticles);

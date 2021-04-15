@@ -44,21 +44,20 @@ struct integrate_functor
         volatile float4 velData = thrust::get<1>(t);
         float3 pos = make_float3(posData.x, posData.y, posData.z);
         float3 vel = make_float3(velData.x, velData.y, velData.z);
-     //   float3 Y = make_float3(velData.x*velData.x+velData.y*velData.y+velData.z*velData.z)
 
-        // params.gamma = 1/(pow(1-pow((vel),2),0.5));
 
-        vel += ( params.electric + cross(vel, params.magnetic)*sqrt(1-(velData.x*velData.x+velData.y*velData.y+velData.z*velData.z))  ) * deltaTime;
+        vel += (-175900000000)*(params.electric + (cross(vel/sqrt(1-(velData.x*velData.x+velData.y*velData.y+velData.z*velData.z)), params.magnetic)*sqrt(1-(velData.x*velData.x+velData.y*velData.y+velData.z*velData.z))))*sqrt(1-(velData.x*velData.x+velData.y*velData.y+velData.z*velData.z)) ;
         vel *= params.globalDamping;
 
         // new position = old position + velocity * deltaTime
-        pos += (vel * deltaTime) *sqrt(1-(velData.x*velData.x+velData.y*velData.y+velData.z*velData.z));
+        pos +=  (vel * deltaTime);
 
         // set this to zero to disable collisions with cube sides
 #if 1
 
         if (pos.x > 1.0f - params.particleRadius)
         {
+        
             pos.x = 1.0f - params.particleRadius;
             vel.x *= params.boundaryDamping;
         }
@@ -240,13 +239,18 @@ float3 collideSpheres(float3 posA, float3 posB,
         float3 tanVel = relVel - (dot(relVel, norm) * norm);
 
         // spring force
-        force = -params.spring*(collideDist - dist) * norm;
+        // force = -params.spring*(collideDist - dist) * norm;
+
+
         // dashpot (damping) force
-        force += params.damping*relVel;
+        // force += params.damping*relVel;
+
+
+
         // tangential shear force
         force += params.shear*tanVel;
         // attraction
-        force += attraction*relPos;
+        // force += attraction*relPos;
     }
 
     return force;
